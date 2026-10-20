@@ -130,7 +130,7 @@ type MathResource = {
   updatedAt: string;
 };
 
-const resourceCategories = ['Pure Mathematics', 'Statistics', 'Mechanics', '综合资料'];
+const defaultResourceCategories = ['Pure Mathematics', 'Statistics', 'Mechanics', '综合资料'];
 const starterResources: MathResource[] = [
   { id: 'resource-1', name: 'Pure Mathematics 3 课程笔记', url: 'https://drive.google.com/', category: 'Pure Mathematics', updatedAt: '2026-10-20' },
   { id: 'resource-2', name: 'Integration 公式与例题整理', url: 'https://docs.google.com/', category: 'Pure Mathematics', updatedAt: '2026-10-18' },
@@ -138,17 +138,24 @@ const starterResources: MathResource[] = [
   { id: 'resource-4', name: 'Mechanics 错题与讲解', url: 'https://onedrive.live.com/', category: 'Mechanics', updatedAt: '2026-10-12' },
 ];
 
-const emptyResource = { name: '', url: '', category: resourceCategories[0] };
+const emptyResource = { name: '', url: '', category: defaultResourceCategories[0] };
 
 function AlevelResourcePage() {
   const [resources, setResources] = useState<MathResource[]>(starterResources);
   const storageReady = useRef(false);
+  const categoryStorageReady = useRef(false);
+  const [categories, setCategories] = useState(defaultResourceCategories);
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState('全部模块');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyResource);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [formError, setFormError] = useState('');
+  const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<string | null>(null);
+  const [categoryNameDraft, setCategoryNameDraft] = useState('');
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [categoryError, setCategoryError] = useState('');
 
   useEffect(() => {
     const stored = window.localStorage.getItem('luca-alevel-resources');
@@ -174,6 +181,30 @@ function AlevelResourcePage() {
     window.localStorage.setItem('luca-alevel-resources', JSON.stringify(resources));
   }, [resources]);
 
+  useEffect(() => {
+    const stored = window.localStorage.getItem('luca-alevel-categories');
+    if (!stored) {
+      categoryStorageReady.current = true;
+      window.localStorage.setItem('luca-alevel-categories', JSON.stringify(defaultResourceCategories));
+      return;
+    }
+    try {
+      const parsed = JSON.parse(stored) as string[];
+      queueMicrotask(() => {
+        categoryStorageReady.current = true;
+        if (Array.isArray(parsed) && parsed.length > 0) setCategories(parsed);
+      });
+    } catch {
+      categoryStorageReady.current = true;
+      window.localStorage.removeItem('luca-alevel-categories');
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!categoryStorageReady.current) return;
+    window.localStorage.setItem('luca-alevel-categories', JSON.stringify(categories));
+  }, [categories]);
+
   const filteredResources = useMemo(() => resources.filter((resource) => {
     const matchesCategory = category === '全部模块' || resource.category === category;
     const term = query.trim().toLowerCase();
@@ -183,8 +214,9 @@ function AlevelResourcePage() {
 
   const openCreate = () => {
     setEditingId(null);
-    setForm(emptyResource);
+    setForm({ name: '', url: '', category: categories[0] ?? defaultResourceCategories[0] });
     setFormError('');
+    setIsCategoryManagerOpen(false);
     setIsEditorOpen(true);
   };
 
@@ -192,6 +224,7 @@ function AlevelResourcePage() {
     setEditingId(resource.id);
     setForm({ name: resource.name, url: resource.url, category: resource.category });
     setFormError('');
+    setIsCategoryManagerOpen(false);
     setIsEditorOpen(true);
   };
 
@@ -199,6 +232,69 @@ function AlevelResourcePage() {
     setIsEditorOpen(false);
     setEditingId(null);
     setFormError('');
+    setIsCategoryManagerOpen(false);
+    setEditingCategory(null);
+    setCategoryError('');
+  };
+
+  const addCategory = () => {
+    const nextName = newCategoryName.trim();
+    if (!nextName) {
+      setCategoryError('请输入分类名称。');
+      return;
+    }
+    if (categories.some((item) => item.toLowerCase() === nextName.toLowerCase())) {
+      setCategoryError('这个分类已经存在。');
+      return;
+    }
+    setCategories((current) => [...current, nextName]);
+    setForm((current) => ({ ...current, category: nextName }));
+    setNewCategoryName('');
+    setCategoryError('');
+  };
+
+  const startRenameCategory = (currentName: string) => {
+    setEditingCategory(currentName);
+    setCategoryNameDraft(currentName);
+    setCategoryError('');
+  };
+
+  const saveCategoryName = () => {
+    if (!editingCategory) return;
+    const nextName = categoryNameDraft.trim();
+    if (!nextName) {
+      setCategoryError('分类名称不能为空。');
+      return;
+    }
+    if (categories.some((item) => item !== editingCategory && item.toLowerCase() === nextName.toLowerCase())) {
+      setCategoryError('这个分类已经存在。');
+      return;
+    }
+    setCategories((current) => current.map((item) => item === editingCategory ? nextName : item));
+    setResources((current) => current.map((resource) => resource.category === editingCategory ? { ...resource, category: nextName } : resource));
+    setForm((current) => current.category === editingCategory ? { ...current, category: nextName } : current);
+    setCategory((current) => current === editingCategory ? nextName : current);
+    setEditingCategory(null);
+    setCategoryError('');
+  };
+
+  const deleteCategory = (categoryName: string) => {
+    if (categories.length === 1) {
+      setCategoryError('至少需要保留一个分类。');
+      return;
+    }
+    const usedCount = resources.filter((resource) => resource.category === categoryName).length;
+    const fallback = categories.find((item) => item !== categoryName) ?? defaultResourceCategories[0];
+    const message = usedCount > 0
+      ? `「${categoryName}」下有 ${usedCount} 条资料，删除后会移动到「${fallback}」。是否继续？`
+      : `确定删除分类「${categoryName}」吗？`;
+    if (!window.confirm(message)) return;
+    setCategories((current) => current.filter((item) => item !== categoryName));
+    setResources((current) => current.map((resource) => resource.category === categoryName ? { ...resource, category: fallback } : resource));
+    setForm((current) => current.category === categoryName ? { ...current, category: fallback } : current);
+    setCategory((current) => current === categoryName ? '全部模块' : current);
+    if (editingCategory === categoryName) setEditingCategory(null);
+    setCategoryError('');
   };
 
   const saveResource = () => {
@@ -243,12 +339,12 @@ function AlevelResourcePage() {
 
       <section className="library-summary" aria-label="资料库概览">
         <div><span>全部资料</span><strong>{resources.length}</strong></div>
-        {resourceCategories.slice(0, 3).map((item) => <div key={item}><span>{item}</span><strong>{resources.filter((resource) => resource.category === item).length}</strong></div>)}
+        {categories.slice(0, 3).map((item) => <div key={item}><span>{item}</span><strong>{resources.filter((resource) => resource.category === item).length}</strong></div>)}
       </section>
 
       <div className="library-toolbar">
         <label className="library-search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索资料名称或 URL" aria-label="搜索资料" /></label>
-        <label className="library-filter"><span>模块</span><select value={category} onChange={(event) => setCategory(event.target.value)} aria-label="按模块筛选"><option>全部模块</option>{resourceCategories.map((item) => <option key={item}>{item}</option>)}</select></label>
+        <label className="library-filter"><span>模块</span><select value={category} onChange={(event) => setCategory(event.target.value)} aria-label="按模块筛选"><option>全部模块</option>{categories.map((item) => <option key={item}>{item}</option>)}</select></label>
       </div>
 
       <div className="resource-table" role="table" aria-label="A-Level 数学资料列表">
@@ -259,7 +355,7 @@ function AlevelResourcePage() {
               <span className="resource-link-icon">↗</span>
               <span><strong>{resource.name}</strong><small>{resource.url.replace(/^https?:\/\//, '')}</small></span>
             </a>
-            <span className={`resource-category category-${resourceCategories.indexOf(resource.category) + 1}`}>{resource.category}</span>
+            <span className={`resource-category category-${categories.indexOf(resource.category) % 4 + 1}`}>{resource.category}</span>
             <time dateTime={resource.updatedAt}>{resource.updatedAt.replaceAll('-', '.')}</time>
             <div className="resource-actions"><a href={resource.url} target="_blank" rel="noreferrer" aria-label={`打开${resource.name}`}>打开</a><button type="button" onClick={() => openEdit(resource)} aria-label={`编辑${resource.name}`}>编辑</button><button type="button" className="delete" onClick={() => deleteResource(resource)} aria-label={`删除${resource.name}`}>删除</button></div>
           </article>
@@ -274,7 +370,28 @@ function AlevelResourcePage() {
           <div className="resource-form">
             <label><span>资料名称</span><input autoFocus value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="例如：Pure Mathematics 课程笔记" /></label>
             <label><span>资料 URL</span><input type="url" value={form.url} onChange={(event) => setForm({ ...form, url: event.target.value })} placeholder="https://..." /></label>
-            <label><span>模块分类</span><select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })}>{resourceCategories.map((item) => <option key={item}>{item}</option>)}</select></label>
+            <div className="resource-category-field">
+              <div className="resource-field-label"><span>模块分类</span><button type="button" onClick={() => { setIsCategoryManagerOpen((current) => !current); setEditingCategory(null); setCategoryError(''); }}>{isCategoryManagerOpen ? '收起管理' : '管理分类'}</button></div>
+              <select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })}>{categories.map((item) => <option key={item}>{item}</option>)}</select>
+              {isCategoryManagerOpen && <div className="category-manager">
+                <div className="category-manager-title"><strong>分类管理</strong><span>新增、重命名或删除</span></div>
+                <div className="category-manager-list">
+                  {categories.map((item) => <div className="category-manager-row" key={item}>
+                    {editingCategory === item ? <>
+                      <input value={categoryNameDraft} onChange={(event) => setCategoryNameDraft(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') saveCategoryName(); if (event.key === 'Escape') setEditingCategory(null); }} aria-label={`编辑分类${item}`} />
+                      <button type="button" className="category-save" onClick={saveCategoryName}>保存</button>
+                      <button type="button" onClick={() => setEditingCategory(null)}>取消</button>
+                    </> : <>
+                      <span><i aria-hidden="true" />{item}<small>{resources.filter((resource) => resource.category === item).length} 条</small></span>
+                      <button type="button" onClick={() => startRenameCategory(item)}>编辑</button>
+                      <button type="button" className="category-delete" onClick={() => deleteCategory(item)}>删除</button>
+                    </>}
+                  </div>)}
+                </div>
+                <div className="category-create"><input value={newCategoryName} onChange={(event) => setNewCategoryName(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') addCategory(); }} placeholder="输入新分类名称" aria-label="新分类名称" /><button type="button" onClick={addCategory}>＋ 添加分类</button></div>
+                {categoryError && <p className="category-error" role="alert">{categoryError}</p>}
+              </div>}
+            </div>
             {formError && <p className="resource-form-error" role="alert">{formError}</p>}
           </div>
           <div className="resource-editor-footer"><button type="button" onClick={closeEditor}>取消</button><button type="button" className="save" onClick={saveResource}>{editingId ? '保存修改' : '添加资料'}</button></div>
