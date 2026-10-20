@@ -52,6 +52,16 @@ const learningPaths = [
   { title: 'AI Agent', code: 'AGENT', progress: 38, current: 'Tool Use · Function Calling', next: '搭建第一个工具调用 Demo', color: '#1c9b80' },
 ];
 
+type AlevelPageId = 'home' | 'resources' | 'map' | 'plan' | 'teaching';
+
+const alevelPages: Array<{ id: AlevelPageId; icon: string; name: string; desc: string }> = [
+  { id: 'home', icon: 'Σ', name: '学习主页', desc: '今日任务、学习进度、继续学习' },
+  { id: 'resources', icon: '⌑', name: '资料中心', desc: '本地文件索引、搜索、预览、分类' },
+  { id: 'map', icon: '⌘', name: '知识地图', desc: 'Pure、Statistics、Mechanics 章节体系' },
+  { id: 'plan', icon: '◷', name: '学习计划', desc: '周计划、每日任务、复习安排' },
+  { id: 'teaching', icon: '▤', name: '教学准备', desc: '讲义、试讲、错题、教学能力评估' },
+];
+
 const projects = [
   { title: '跨境电商', code: 'ECOMMERCE', status: '进行中', progress: 54, accent: '#d17b32', accentSoft: '#fff1e5', tasks: ['整理新品上架素材', '复盘广告数据', '检查核心商品库存'], resources: ['选品表', '素材库', '运营周报'] },
   { title: '个人工作台开发', code: 'WORKSPACE', status: '设计阶段', progress: 72, accent: '#6674f6', accentSoft: '#eef0ff', tasks: ['确认首版信息架构', '完善移动端布局', '整理下一版功能清单'], resources: ['需求文档', '页面设计', '开发记录'] },
@@ -112,17 +122,147 @@ function TodayWorkspace() {
   );
 }
 
+function AlevelResourcePage() {
+  const [importMode, setImportMode] = useState<'folder' | 'files'>('folder');
+  const [autoClassify, setAutoClassify] = useState(true);
+  const [dedupe, setDedupe] = useState(true);
+
+  return (
+    <div className="alevel-resource-layout">
+      <article className="import-card glass-panel">
+        <div className="import-title-row">
+          <div><span>RESOURCE IMPORT</span><h3>导入学习资料</h3><p>把教材、讲义和练习题整理进 A-Level 数学资料库。</p></div>
+          <span className="demo-badge">交互示例</span>
+        </div>
+
+        <div className="import-segmented" role="tablist" aria-label="导入方式">
+          <button type="button" role="tab" aria-selected={importMode === 'folder'} className={importMode === 'folder' ? 'active' : ''} onClick={() => setImportMode('folder')}>导入文件夹</button>
+          <button type="button" role="tab" aria-selected={importMode === 'files'} className={importMode === 'files' ? 'active' : ''} onClick={() => setImportMode('files')}>导入文件</button>
+        </div>
+
+        <div className="drop-zone">
+          <span className="upload-symbol" aria-hidden="true"><i>{importMode === 'folder' ? '⌑' : '▤'}</i>↑</span>
+          <strong>{importMode === 'folder' ? '选择本地数学资料文件夹' : '选择 PDF、PPT、Word 等文件'}</strong>
+          <p>{importMode === 'folder' ? '适合一次导入完整课程资料，并保留原有目录结构。' : '支持选择一个或多个学习文件进行导入。'}</p>
+          <button type="button">{importMode === 'folder' ? '选择文件夹' : '选择文件'}</button>
+          <small>当前为交互设计示例，实际文件选择与读取将在工作台功能开发阶段接入。</small>
+        </div>
+
+        <div className="import-options">
+          <label><input type="checkbox" checked={autoClassify} onChange={(event) => setAutoClassify(event.target.checked)} /><span className="custom-check">✓</span><span><strong>自动识别章节与知识点</strong><small>根据文件内容关联 Pure Mathematics、Statistics 等学习主题</small></span></label>
+          <label><input type="checkbox" checked={dedupe} onChange={(event) => setDedupe(event.target.checked)} /><span className="custom-check">✓</span><span><strong>检查重复文件</strong><small>通过文件信息与内容摘要避免重复导入</small></span></label>
+        </div>
+
+        <div className="process-preview">
+          <div><span>预期处理流程</span><b>{[autoClassify, dedupe].filter(Boolean).length + 4} 个步骤</b></div>
+          <div className="process-steps">
+            <span>读取文件</span><i>→</i><span>提取内容</span><i>→</i><span>{autoClassify ? 'AI 分类' : '保持未分类'}</span>{dedupe && <><i>→</i><span>重复检测</span></>}<i>→</i><span>等待确认</span><i>→</i><span>加入资料库</span>
+          </div>
+        </div>
+      </article>
+
+      <aside className="index-strategy glass-panel">
+        <span className="strategy-icon">⌘</span>
+        <span className="strategy-kicker">LOCAL-FIRST</span>
+        <h3>保留原文件<br />建立轻量索引</h3>
+        <p>原始教材仍然保存在你的电脑上，工作台只保存文件位置与学习索引，避免产生大量重复文件。</p>
+        <div className="strategy-map">
+          <div><span>你的电脑</span><strong>原始教材与资料</strong><small>继续由你管理和更新</small></div>
+          <i>⇄</i>
+          <div><span>个人工作台</span><strong>路径、文本与知识点</strong><small>用于检索与学习关联</small></div>
+        </div>
+        <div className="browser-note"><span>i</span><p><strong>浏览器权限说明</strong>普通网页无法在未授权时持续读取本地文件夹。首版可以通过文件夹选择或文件上传导入；自动同步可在后续通过本地服务或桌面应用实现。</p></div>
+      </aside>
+    </div>
+  );
+}
+
+function AlevelHomePage() {
+  return (
+    <div className="alevel-dashboard">
+      <section className="alevel-stat-grid">
+        <div><span>本周学习</span><strong>4.6h</strong><small>目标 6 小时</small></div>
+        <div><span>课程进度</span><strong>62%</strong><small>Pure 3 进行中</small></div>
+        <div><span>待复习</span><strong>08</strong><small>2 个高频错题</small></div>
+      </section>
+      <section className="alevel-home-grid">
+        <article className="alevel-panel">
+          <SectionHeading kicker="TODAY" title="今日任务" action="全部任务" />
+          <div className="math-task-list">
+            <button type="button"><i>1</i><span><strong>Integration by substitution</strong><small>练习 6 题 · 预计 35 分钟</small></span><b>开始</b></button>
+            <button type="button"><i>2</i><span><strong>复盘昨日错题</strong><small>Pure Mathematics · Chapter 7</small></span><b>查看</b></button>
+            <button type="button"><i>3</i><span><strong>整理公式卡片</strong><small>Statistics · Probability</small></span><b>继续</b></button>
+          </div>
+        </article>
+        <article className="alevel-panel continue-card">
+          <span className="continue-kicker">CONTINUE LEARNING</span>
+          <span className="continue-symbol">∫</span>
+          <h3>Integration</h3>
+          <p>Pure Mathematics 3 · 章节 7.2</p>
+          <div><span style={{ width: '68%' }} /></div>
+          <button type="button">继续学习 <span>→</span></button>
+        </article>
+      </section>
+    </div>
+  );
+}
+
+function AlevelKnowledgeMap() {
+  const tracks = [
+    { name: 'Pure Mathematics', detail: 'Algebra · Calculus · Trigonometry', progress: 66, color: '#5572e7' },
+    { name: 'Statistics', detail: 'Probability · Distribution · Hypothesis', progress: 42, color: '#9b6bdb' },
+    { name: 'Mechanics', detail: 'Forces · Motion · Momentum', progress: 28, color: '#d17b32' },
+  ];
+  return <div className="alevel-subpage"><div className="subpage-heading"><span>KNOWLEDGE MAP</span><h3>知识地图</h3><p>按考试体系组织章节，清楚看到已掌握、学习中和待开始的知识点。</p></div><div className="knowledge-tracks">{tracks.map((track) => <article key={track.name} style={{ '--track-color': track.color } as React.CSSProperties}><div><span>◉</span><b>{track.progress}%</b></div><h4>{track.name}</h4><p>{track.detail}</p><div className="track-progress"><span style={{ width: `${track.progress}%` }} /></div><button type="button">展开章节 <span>→</span></button></article>)}</div></div>;
+}
+
+function AlevelPlanPage() {
+  return <div className="alevel-subpage"><div className="subpage-heading"><span>STUDY PLAN</span><h3>学习计划</h3><p>把周目标拆成每天能完成的小任务，并提前安排复习节点。</p></div><div className="plan-overview"><article><strong>本周目标</strong><b>12 / 18</b><span><i style={{ width: '67%' }} /></span><small>已完成 12 项任务</small></article><article><strong>下一次复习</strong><b>明天</b><span className="review-topic">Integration · 错题复盘</span><small>预计 30 分钟</small></article></div><div className="week-plan">{['一','二','三','四','五','六','日'].map((day,index)=><button type="button" className={index===1?'today':''} key={day}><span>周{day}</span><strong>{[3,2,3,2,3,1,1][index]} 项</strong><small>{index<5?'学习 + 复习':'轻量回顾'}</small></button>)}</div></div>;
+}
+
+function AlevelTeachingPage() {
+  return <div className="alevel-subpage"><div className="subpage-heading"><span>TEACHING PREP</span><h3>教学准备</h3><p>把学习成果转化为可讲清楚、可演示、可复盘的教学能力。</p></div><div className="teaching-grid"><article><span>01</span><div><strong>讲义与板书</strong><small>整理 4 份 · 待完善 2 份</small></div><button type="button">查看</button></article><article><span>02</span><div><strong>试讲练习</strong><small>本周目标 2 次 · 已完成 1 次</small></div><button type="button">开始</button></article><article><span>03</span><div><strong>错题讲解库</strong><small>收录 18 题 · 5 题待录入</small></div><button type="button">整理</button></article><article><span>04</span><div><strong>教学能力评估</strong><small>表达、结构、互动与节奏</small></div><button type="button">评估</button></article></div></div>;
+}
+
+function AlevelWorkspace({ activePage, onSelect, onBack }: { activePage: AlevelPageId; onSelect: (page: AlevelPageId) => void; onBack: () => void }) {
+  const current = alevelPages.find((page) => page.id === activePage) ?? alevelPages[0];
+  return (
+    <div className="module-content alevel-workspace">
+      <div className="alevel-breadcrumb"><button type="button" onClick={onBack} aria-label="返回学习中心">←</button><span>学习中心</span><i>›</i><strong>A-Level 数学</strong></div>
+      <header className="alevel-header"><div className="alevel-title-icon">Σ</div><div><span>A-LEVEL MATHEMATICS</span><h2>A-Level 数学</h2><p>专注学习、资料管理与教学准备的统一空间。</p></div><div className="alevel-overall"><span>总体进度</span><strong>62%</strong></div></header>
+      <div className="alevel-shell">
+        <nav className="alevel-subnav glass-panel" aria-label="A-Level 数学二级导航">
+          {alevelPages.map((page) => <button type="button" key={page.id} className={page.id === activePage ? 'active' : ''} onClick={() => onSelect(page.id)} aria-current={page.id === activePage ? 'page' : undefined}><span className="alevel-nav-icon">{page.icon}</span><span><strong>{page.name}</strong><small>{page.desc}</small></span><i>›</i></button>)}
+        </nav>
+        <section className="alevel-page glass-panel" aria-label={current.name}>
+          {activePage === 'home' && <AlevelHomePage />}
+          {activePage === 'resources' && <AlevelResourcePage />}
+          {activePage === 'map' && <AlevelKnowledgeMap />}
+          {activePage === 'plan' && <AlevelPlanPage />}
+          {activePage === 'teaching' && <AlevelTeachingPage />}
+        </section>
+      </div>
+    </div>
+  );
+}
+
 function LearningCenter() {
+  const [view, setView] = useState<'overview' | 'alevel'>('overview');
+  const [mathPage, setMathPage] = useState<AlevelPageId>('home');
+  const openMath = (page: AlevelPageId) => { setMathPage(page); setView('alevel'); };
+
+  if (view === 'alevel') return <AlevelWorkspace activePage={mathPage} onSelect={setMathPage} onBack={() => setView('overview')} />;
+
   return (
     <div className="module-content learning-layout">
       <section className="learning-paths">
-        {learningPaths.map((path) => <article className="path-card glass-panel" key={path.title} style={{ '--path-accent': path.color } as React.CSSProperties}><div className="path-top"><span>{path.code}</span><b>{path.progress}%</b></div><h3>{path.title}</h3><p>{path.current}</p><div className="path-progress"><span style={{ width: `${path.progress}%` }} /></div><div className="path-next"><small>下一步</small><strong>{path.next}</strong></div><button type="button">继续学习 <span>→</span></button></article>)}
+        {learningPaths.map((path) => <article className="path-card glass-panel" key={path.title} style={{ '--path-accent': path.color } as React.CSSProperties}><div className="path-top"><span>{path.code}</span><b>{path.progress}%</b></div><h3>{path.title}</h3><p>{path.current}</p><div className="path-progress"><span style={{ width: `${path.progress}%` }} /></div><div className="path-next"><small>下一步</small><strong>{path.next}</strong></div><button type="button" onClick={path.code === 'MATH' ? () => openMath('home') : undefined}>{path.code === 'MATH' ? '进入数学空间' : '继续学习'} <span>→</span></button></article>)}
       </section>
 
       <article className="workspace-card resource-card glass-panel">
         <SectionHeading kicker="RESOURCE LIBRARY" title="资料管理" action="全部资料" />
         <div className="resource-stats"><div><strong>24</strong><span>课程资料</span></div><div><strong>18</strong><span>学习笔记</span></div><div><strong>07</strong><span>练习与项目</span></div></div>
-        <div className="resource-folders"><button type="button"><span className="folder-symbol">⌑</span><div><strong>A-Level Mathematics</strong><small>14 个文件 · 今天更新</small></div><i>›</i></button><button type="button"><span className="folder-symbol agent-folder">⌑</span><div><strong>AI Agent Lab</strong><small>11 个文件 · 昨天更新</small></div><i>›</i></button></div>
+        <div className="resource-folders"><button type="button" onClick={() => openMath('resources')}><span className="folder-symbol">⌑</span><div><strong>A-Level Mathematics</strong><small>14 个文件 · 导入与管理</small></div><i>›</i></button><button type="button"><span className="folder-symbol agent-folder">⌑</span><div><strong>AI Agent Lab</strong><small>11 个文件 · 昨天更新</small></div><i>›</i></button></div>
       </article>
 
       <article className="workspace-card study-progress glass-panel">
