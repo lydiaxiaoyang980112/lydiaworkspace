@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 type ModuleId = 'today' | 'learning' | 'projects';
 
@@ -56,7 +56,7 @@ type AlevelPageId = 'home' | 'resources' | 'map' | 'plan' | 'teaching';
 
 const alevelPages: Array<{ id: AlevelPageId; icon: string; name: string; desc: string }> = [
   { id: 'home', icon: 'Σ', name: '学习主页', desc: '今日任务、学习进度、继续学习' },
-  { id: 'resources', icon: '⌑', name: '资料中心', desc: '本地文件索引、搜索、预览、分类' },
+  { id: 'resources', icon: '⌑', name: '资料中心', desc: '在线文档链接、搜索、编辑与分类' },
   { id: 'map', icon: '⌘', name: '知识地图', desc: 'Pure、Statistics、Mechanics 章节体系' },
   { id: 'plan', icon: '◷', name: '学习计划', desc: '周计划、每日任务、复习安排' },
   { id: 'teaching', icon: '▤', name: '教学准备', desc: '讲义、试讲、错题、教学能力评估' },
@@ -122,57 +122,164 @@ function TodayWorkspace() {
   );
 }
 
+type MathResource = {
+  id: string;
+  name: string;
+  url: string;
+  category: string;
+  updatedAt: string;
+};
+
+const resourceCategories = ['Pure Mathematics', 'Statistics', 'Mechanics', '综合资料'];
+const starterResources: MathResource[] = [
+  { id: 'resource-1', name: 'Pure Mathematics 3 课程笔记', url: 'https://drive.google.com/', category: 'Pure Mathematics', updatedAt: '2026-10-20' },
+  { id: 'resource-2', name: 'Integration 公式与例题整理', url: 'https://docs.google.com/', category: 'Pure Mathematics', updatedAt: '2026-10-18' },
+  { id: 'resource-3', name: 'Statistics 2 Revision Guide', url: 'https://www.notion.so/', category: 'Statistics', updatedAt: '2026-10-15' },
+  { id: 'resource-4', name: 'Mechanics 错题与讲解', url: 'https://onedrive.live.com/', category: 'Mechanics', updatedAt: '2026-10-12' },
+];
+
+const emptyResource = { name: '', url: '', category: resourceCategories[0] };
+
 function AlevelResourcePage() {
-  const [importMode, setImportMode] = useState<'folder' | 'files'>('folder');
-  const [autoClassify, setAutoClassify] = useState(true);
-  const [dedupe, setDedupe] = useState(true);
+  const [resources, setResources] = useState<MathResource[]>(starterResources);
+  const storageReady = useRef(false);
+  const [query, setQuery] = useState('');
+  const [category, setCategory] = useState('全部模块');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [form, setForm] = useState(emptyResource);
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [formError, setFormError] = useState('');
+
+  useEffect(() => {
+    const stored = window.localStorage.getItem('luca-alevel-resources');
+    if (!stored) {
+      storageReady.current = true;
+      window.localStorage.setItem('luca-alevel-resources', JSON.stringify(starterResources));
+      return;
+    }
+    try {
+      const parsed = JSON.parse(stored) as MathResource[];
+      queueMicrotask(() => {
+        storageReady.current = true;
+        if (Array.isArray(parsed)) setResources(parsed);
+      });
+    } catch {
+      storageReady.current = true;
+      window.localStorage.removeItem('luca-alevel-resources');
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!storageReady.current) return;
+    window.localStorage.setItem('luca-alevel-resources', JSON.stringify(resources));
+  }, [resources]);
+
+  const filteredResources = useMemo(() => resources.filter((resource) => {
+    const matchesCategory = category === '全部模块' || resource.category === category;
+    const term = query.trim().toLowerCase();
+    const matchesQuery = !term || resource.name.toLowerCase().includes(term) || resource.url.toLowerCase().includes(term);
+    return matchesCategory && matchesQuery;
+  }), [resources, query, category]);
+
+  const openCreate = () => {
+    setEditingId(null);
+    setForm(emptyResource);
+    setFormError('');
+    setIsEditorOpen(true);
+  };
+
+  const openEdit = (resource: MathResource) => {
+    setEditingId(resource.id);
+    setForm({ name: resource.name, url: resource.url, category: resource.category });
+    setFormError('');
+    setIsEditorOpen(true);
+  };
+
+  const closeEditor = () => {
+    setIsEditorOpen(false);
+    setEditingId(null);
+    setFormError('');
+  };
+
+  const saveResource = () => {
+    const name = form.name.trim();
+    const rawUrl = form.url.trim();
+    if (!name || !rawUrl) {
+      setFormError('请填写资料名称和 URL。');
+      return;
+    }
+    let normalizedUrl = rawUrl;
+    if (!/^https?:\/\//i.test(normalizedUrl)) normalizedUrl = `https://${normalizedUrl}`;
+    try {
+      new URL(normalizedUrl);
+    } catch {
+      setFormError('请输入有效的网址。');
+      return;
+    }
+    const nextResource: MathResource = {
+      id: editingId ?? `resource-${Date.now()}`,
+      name,
+      url: normalizedUrl,
+      category: form.category,
+      updatedAt: new Date().toISOString().slice(0, 10),
+    };
+    setResources((current) => editingId
+      ? current.map((resource) => resource.id === editingId ? nextResource : resource)
+      : [nextResource, ...current]);
+    closeEditor();
+  };
+
+  const deleteResource = (resource: MathResource) => {
+    if (!window.confirm(`确定删除「${resource.name}」吗？`)) return;
+    setResources((current) => current.filter((item) => item.id !== resource.id));
+  };
 
   return (
-    <div className="alevel-resource-layout">
-      <article className="import-card glass-panel">
-        <div className="import-title-row">
-          <div><span>RESOURCE IMPORT</span><h3>导入学习资料</h3><p>把教材、讲义和练习题整理进 A-Level 数学资料库。</p></div>
-          <span className="demo-badge">交互示例</span>
-        </div>
+    <div className="document-library">
+      <header className="library-heading">
+        <div><span>ONLINE DOCUMENT LIBRARY</span><h3>线上资料库</h3><p>集中管理 A-Level 数学文档链接，随时新增、编辑、分类或打开资料。</p></div>
+        <button type="button" className="library-add" onClick={openCreate}><span>＋</span> 新增资料</button>
+      </header>
 
-        <div className="import-segmented" role="tablist" aria-label="导入方式">
-          <button type="button" role="tab" aria-selected={importMode === 'folder'} className={importMode === 'folder' ? 'active' : ''} onClick={() => setImportMode('folder')}>导入文件夹</button>
-          <button type="button" role="tab" aria-selected={importMode === 'files'} className={importMode === 'files' ? 'active' : ''} onClick={() => setImportMode('files')}>导入文件</button>
-        </div>
+      <section className="library-summary" aria-label="资料库概览">
+        <div><span>全部资料</span><strong>{resources.length}</strong></div>
+        {resourceCategories.slice(0, 3).map((item) => <div key={item}><span>{item}</span><strong>{resources.filter((resource) => resource.category === item).length}</strong></div>)}
+      </section>
 
-        <div className="drop-zone">
-          <span className="upload-symbol" aria-hidden="true"><i>{importMode === 'folder' ? '⌑' : '▤'}</i>↑</span>
-          <strong>{importMode === 'folder' ? '选择本地数学资料文件夹' : '选择 PDF、PPT、Word 等文件'}</strong>
-          <p>{importMode === 'folder' ? '适合一次导入完整课程资料，并保留原有目录结构。' : '支持选择一个或多个学习文件进行导入。'}</p>
-          <button type="button">{importMode === 'folder' ? '选择文件夹' : '选择文件'}</button>
-          <small>当前为交互设计示例，实际文件选择与读取将在工作台功能开发阶段接入。</small>
-        </div>
+      <div className="library-toolbar">
+        <label className="library-search"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索资料名称或 URL" aria-label="搜索资料" /></label>
+        <label className="library-filter"><span>模块</span><select value={category} onChange={(event) => setCategory(event.target.value)} aria-label="按模块筛选"><option>全部模块</option>{resourceCategories.map((item) => <option key={item}>{item}</option>)}</select></label>
+      </div>
 
-        <div className="import-options">
-          <label><input type="checkbox" checked={autoClassify} onChange={(event) => setAutoClassify(event.target.checked)} /><span className="custom-check">✓</span><span><strong>自动识别章节与知识点</strong><small>根据文件内容关联 Pure Mathematics、Statistics 等学习主题</small></span></label>
-          <label><input type="checkbox" checked={dedupe} onChange={(event) => setDedupe(event.target.checked)} /><span className="custom-check">✓</span><span><strong>检查重复文件</strong><small>通过文件信息与内容摘要避免重复导入</small></span></label>
-        </div>
+      <div className="resource-table" role="table" aria-label="A-Level 数学资料列表">
+        <div className="resource-table-head" role="row"><span>资料名称</span><span>模块分类</span><span>更新日期</span><span>操作</span></div>
+        {filteredResources.length > 0 ? filteredResources.map((resource) => (
+          <article className="resource-record" role="row" key={resource.id}>
+            <a className="resource-identity" href={resource.url} target="_blank" rel="noreferrer">
+              <span className="resource-link-icon">↗</span>
+              <span><strong>{resource.name}</strong><small>{resource.url.replace(/^https?:\/\//, '')}</small></span>
+            </a>
+            <span className={`resource-category category-${resourceCategories.indexOf(resource.category) + 1}`}>{resource.category}</span>
+            <time dateTime={resource.updatedAt}>{resource.updatedAt.replaceAll('-', '.')}</time>
+            <div className="resource-actions"><a href={resource.url} target="_blank" rel="noreferrer" aria-label={`打开${resource.name}`}>打开</a><button type="button" onClick={() => openEdit(resource)} aria-label={`编辑${resource.name}`}>编辑</button><button type="button" className="delete" onClick={() => deleteResource(resource)} aria-label={`删除${resource.name}`}>删除</button></div>
+          </article>
+        )) : <div className="library-empty"><span>⌕</span><strong>没有找到相关资料</strong><p>调整搜索条件，或新增一条学习资料。</p><button type="button" onClick={openCreate}>新增资料</button></div>}
+      </div>
 
-        <div className="process-preview">
-          <div><span>预期处理流程</span><b>{[autoClassify, dedupe].filter(Boolean).length + 4} 个步骤</b></div>
-          <div className="process-steps">
-            <span>读取文件</span><i>→</i><span>提取内容</span><i>→</i><span>{autoClassify ? 'AI 分类' : '保持未分类'}</span>{dedupe && <><i>→</i><span>重复检测</span></>}<i>→</i><span>等待确认</span><i>→</i><span>加入资料库</span>
+      <footer className="library-storage-note"><span>✓</span><p><strong>自动保存</strong> 资料会保存在当前浏览器中，刷新页面后仍会保留。</p></footer>
+
+      {isEditorOpen && <div className="resource-editor-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeEditor(); }}>
+        <section className="resource-editor" role="dialog" aria-modal="true" aria-labelledby="resource-editor-title">
+          <div className="resource-editor-head"><div><span>{editingId ? 'EDIT RESOURCE' : 'NEW RESOURCE'}</span><h3 id="resource-editor-title">{editingId ? '编辑资料' : '新增资料'}</h3></div><button type="button" onClick={closeEditor} aria-label="关闭编辑器">×</button></div>
+          <div className="resource-form">
+            <label><span>资料名称</span><input autoFocus value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} placeholder="例如：Pure Mathematics 课程笔记" /></label>
+            <label><span>资料 URL</span><input type="url" value={form.url} onChange={(event) => setForm({ ...form, url: event.target.value })} placeholder="https://..." /></label>
+            <label><span>模块分类</span><select value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })}>{resourceCategories.map((item) => <option key={item}>{item}</option>)}</select></label>
+            {formError && <p className="resource-form-error" role="alert">{formError}</p>}
           </div>
-        </div>
-      </article>
-
-      <aside className="index-strategy glass-panel">
-        <span className="strategy-icon">⌘</span>
-        <span className="strategy-kicker">LOCAL-FIRST</span>
-        <h3>保留原文件<br />建立轻量索引</h3>
-        <p>原始教材仍然保存在你的电脑上，工作台只保存文件位置与学习索引，避免产生大量重复文件。</p>
-        <div className="strategy-map">
-          <div><span>你的电脑</span><strong>原始教材与资料</strong><small>继续由你管理和更新</small></div>
-          <i>⇄</i>
-          <div><span>个人工作台</span><strong>路径、文本与知识点</strong><small>用于检索与学习关联</small></div>
-        </div>
-        <div className="browser-note"><span>i</span><p><strong>浏览器权限说明</strong>普通网页无法在未授权时持续读取本地文件夹。首版可以通过文件夹选择或文件上传导入；自动同步可在后续通过本地服务或桌面应用实现。</p></div>
-      </aside>
+          <div className="resource-editor-footer"><button type="button" onClick={closeEditor}>取消</button><button type="button" className="save" onClick={saveResource}>{editingId ? '保存修改' : '添加资料'}</button></div>
+        </section>
+      </div>}
     </div>
   );
 }
