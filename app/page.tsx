@@ -2,8 +2,10 @@
 
 import { useMemo, useState } from 'react';
 
-type WorkspaceSection = {
-  id: string;
+type ModuleId = 'today' | 'learning' | 'projects';
+
+type WorkspaceModule = {
+  id: ModuleId;
   label: string;
   icon: string;
   eyebrow: string;
@@ -11,365 +13,167 @@ type WorkspaceSection = {
   description: string;
   accent: string;
   accentSoft: string;
-  metrics: Array<{ value: string; label: string; hint: string }>;
-  tasks: Array<{ title: string; meta: string; done?: boolean }>;
-  focus: Array<{ label: string; value: number }>;
-  note: string;
+  action: string;
+  aiPrompts: string[];
 };
 
-const sections: WorkspaceSection[] = [
+const modules: WorkspaceModule[] = [
   {
-    id: 'home', label: '我的主页', icon: '⌂', eyebrow: 'PERSONAL OVERVIEW',
-    title: '把生活和工作，收进同一张桌面。',
-    description: '今天的重点、近期进展与待处理事项，都在这里一目了然。',
-    accent: '#6d7cff', accentSoft: '#eef0ff',
-    metrics: [
-      { value: '03', label: '今日重点', hint: '保持轻盈' },
-      { value: '76%', label: '本周节奏', hint: '状态不错' },
-      { value: '05', label: '进行中的事', hint: '稳步推进' },
-    ],
-    tasks: [
-      { title: '整理本周工作优先级', meta: '09:30 · 工作', done: true },
-      { title: '完成作品集内容复盘', meta: '14:00 · 求职' },
-      { title: '晚间 30 分钟慢跑', meta: '19:30 · 运动' },
-    ],
-    focus: [
-      { label: '工作', value: 82 }, { label: '学习', value: 64 },
-      { label: '生活', value: 48 }, { label: '运动', value: 71 },
-    ],
-    note: '今天适合把最重要的一件事，做得比昨天更完整一点。',
+    id: 'today', label: '今日工作台', icon: '⌂', eyebrow: 'TODAY WORKSPACE',
+    title: '从今天最重要的事开始。',
+    description: '任务、灵感、学习与项目入口集中在一个页面，减少切换，把注意力留给真正重要的工作。',
+    accent: '#6674f6', accentSoft: '#eef0ff', action: '开始今日计划',
+    aiPrompts: ['帮我安排今天的任务顺序', '把这段想法整理成待办', '总结我最近的学习重点'],
   },
   {
-    id: 'today', label: '今日规划', icon: '◷', eyebrow: 'TODAY PLAN',
-    title: '让今天的每一步，都有清晰方向。',
-    description: '用简单的节奏安排重点任务，同时给临时变化留出空间。',
-    accent: '#ff8b5d', accentSoft: '#fff0e9',
-    metrics: [
-      { value: '06', label: '今日事项', hint: '3 项优先' },
-      { value: '02', label: '专注时段', hint: '共 3 小时' },
-      { value: '01', label: '待确认', hint: '稍后处理' },
-    ],
-    tasks: [
-      { title: '上午深度工作时段', meta: '09:30—11:30', done: true },
-      { title: '梳理下午会议资料', meta: '13:40 · 30 分钟' },
-      { title: '处理今日收尾事项', meta: '17:30 · 轻任务' },
-    ],
-    focus: [
-      { label: '上午', value: 88 }, { label: '中午', value: 42 },
-      { label: '下午', value: 70 }, { label: '晚间', value: 54 },
-    ],
-    note: '给每段任务留出十分钟缓冲，计划会更容易真正执行。',
+    id: 'learning', label: '学习中心', icon: '◫', eyebrow: 'LEARNING CENTER',
+    title: '让每一次学习都有清晰路径。',
+    description: '围绕 A-Level 数学与 AI Agent 两条主线，统一管理课程资料、阶段进度与下一步行动。',
+    accent: '#168a78', accentSoft: '#e8f7f3', action: '继续上次学习',
+    aiPrompts: ['解释一道 A-Level 数学题', '为我设计 AI Agent 学习计划', '整理今天的学习笔记'],
   },
   {
-    id: 'assistant', label: '工作助理', icon: '✦', eyebrow: 'WORK ASSISTANT',
-    title: '让琐事停在助理这里。',
-    description: '集中查看需要整理、撰写与跟进的工作，让注意力回到关键判断。',
-    accent: '#7b61d1', accentSoft: '#f1edff',
-    metrics: [
-      { value: '04', label: '待整理', hint: '2 项较急' },
-      { value: '08', label: '本周完成', hint: '效率稳定' },
-      { value: '03', label: '快捷模板', hint: '随时调用' },
-    ],
-    tasks: [
-      { title: '汇总项目会议要点', meta: '会议纪要', done: true },
-      { title: '拟定客户跟进邮件', meta: '文字撰写' },
-      { title: '整理下周项目清单', meta: '任务规划' },
-    ],
-    focus: [
-      { label: '整理', value: 76 }, { label: '撰写', value: 62 },
-      { label: '跟进', value: 52 }, { label: '归档', value: 35 },
-    ],
-    note: '把重复工作交给流程，把真正重要的判断留给自己。',
-  },
-  {
-    id: 'fitness', label: '运动打卡', icon: '◌', eyebrow: 'MOVE & BREATHE',
-    title: '身体有节奏，生活才有余裕。',
-    description: '记录每一次微小运动，让坚持变成一种自然发生的日常。',
-    accent: '#2ea97d', accentSoft: '#e8f8f2',
-    metrics: [
-      { value: '4 天', label: '连续运动', hint: '继续保持' },
-      { value: '116', label: '本周分钟', hint: '目标 150' },
-      { value: '72%', label: '目标进度', hint: '状态良好' },
-    ],
-    tasks: [
-      { title: '晨间拉伸', meta: '12 分钟 · 舒缓', done: true },
-      { title: '户外慢跑', meta: '30 分钟 · 有氧' },
-      { title: '睡前肩颈放松', meta: '8 分钟 · 恢复' },
-    ],
-    focus: [
-      { label: '周一', value: 72 }, { label: '周二', value: 46 },
-      { label: '周三', value: 85 }, { label: '今天', value: 63 },
-    ],
-    note: '不必每次都突破极限，愿意开始本身就是今天的胜利。',
-  },
-  {
-    id: 'pet', label: '宠物日记', icon: '♡', eyebrow: 'PET JOURNAL',
-    title: '收藏它陪伴你的每个瞬间。',
-    description: '饮食、健康和有趣日常，都可以成为以后翻看的温柔记忆。',
-    accent: '#ed719d', accentSoft: '#fff0f5',
-    metrics: [
-      { value: '12', label: '本月记录', hint: '好多回忆' },
-      { value: '2 天', label: '下次护理', hint: '记得准备' },
-      { value: '良好', label: '今日状态', hint: '活力满满' },
-    ],
-    tasks: [
-      { title: '早晚粮与饮水记录', meta: '今日 · 已完成', done: true },
-      { title: '整理周末散步照片', meta: '相册 · 8 张' },
-      { title: '预约月度护理', meta: '本周内' },
-    ],
-    focus: [
-      { label: '饮食', value: 86 }, { label: '玩耍', value: 72 },
-      { label: '睡眠', value: 91 }, { label: '护理', value: 58 },
-    ],
-    note: '它的一生也许不长，但你可以让每一天都很值得。',
-  },
-  {
-    id: 'career', label: '求职进展', icon: '◇', eyebrow: 'CAREER TRACKER',
-    title: '把每次靠近机会的过程看得见。',
-    description: '统一整理投递、沟通和面试节点，让下一步始终清楚。',
-    accent: '#327bd8', accentSoft: '#eaf3ff',
-    metrics: [
-      { value: '08', label: '进行中', hint: '2 个新回复' },
-      { value: '03', label: '面试阶段', hint: '本周 1 场' },
-      { value: '18', label: '累计投递', hint: '持续优化' },
-    ],
-    tasks: [
-      { title: '更新目标岗位作品集', meta: '作品集 · 进行中', done: true },
-      { title: '准备产品案例复盘', meta: '周四面试' },
-      { title: '跟进上周沟通结果', meta: '邮件 · 明天' },
-    ],
-    focus: [
-      { label: '收藏', value: 78 }, { label: '投递', value: 64 },
-      { label: '沟通', value: 42 }, { label: '面试', value: 28 },
-    ],
-    note: '每一次认真准备，都在缩短你与理想机会之间的距离。',
-  },
-  {
-    id: 'commerce', label: '跨境电商', icon: '◈', eyebrow: 'GLOBAL COMMERCE',
-    title: '看清生意正在发生的地方。',
-    description: '聚合店铺节奏、商品状态与待办事项，快速找到今日重点。',
-    accent: '#d69a22', accentSoft: '#fff7e5',
-    metrics: [
-      { value: '24', label: '在售商品', hint: '状态正常' },
-      { value: '06', label: '待处理事项', hint: '2 项优先' },
-      { value: '89%', label: '店铺健康度', hint: '稳定运行' },
-    ],
-    tasks: [
-      { title: '检查核心商品库存', meta: '库存 · 已同步', done: true },
-      { title: '整理新品上架素材', meta: '内容 · 6 项' },
-      { title: '复盘本周广告表现', meta: '数据 · 周五' },
-    ],
-    focus: [
-      { label: '商品', value: 84 }, { label: '内容', value: 68 },
-      { label: '流量', value: 58 }, { label: '履约', value: 76 },
-    ],
-    note: '先照顾好最重要的商品，再让每一个动作服务于增长。',
-  },
-  {
-    id: 'learning', label: '学习文档', icon: '▤', eyebrow: 'LEARNING SPACE',
-    title: '让学过的内容，慢慢长成体系。',
-    description: '集中沉淀笔记、资料与想法，随时回到知识生长的地方。',
-    accent: '#20a1b5', accentSoft: '#e8f8fa',
-    metrics: [
-      { value: '36', label: '全部文档', hint: '本周 +4' },
-      { value: '05', label: '学习主题', hint: '持续更新' },
-      { value: '68%', label: '阅读进度', hint: '稳步积累' },
-    ],
-    tasks: [
-      { title: '整理交互设计课程笔记', meta: '设计 · 12 条', done: true },
-      { title: '阅读品牌增长案例', meta: '文章 · 18 分钟' },
-      { title: '补充本周灵感清单', meta: '随手记 · 4 条' },
-    ],
-    focus: [
-      { label: '设计', value: 82 }, { label: '商业', value: 61 },
-      { label: '语言', value: 46 }, { label: '工具', value: 70 },
-    ],
-    note: '真正属于你的知识，是那些被理解、连接并反复使用的内容。',
+    id: 'projects', label: '项目中心', icon: '◇', eyebrow: 'PROJECT CENTER',
+    title: '把正在推进的事放在眼前。',
+    description: '跨境电商、个人工作台开发等项目的任务、资料与节点统一归拢，随时知道下一步。',
+    accent: '#d17b32', accentSoft: '#fff1e5', action: '查看全部项目',
+    aiPrompts: ['梳理跨境电商本周重点', '拆解工作台下一阶段任务', '生成项目周报'],
   },
 ];
 
+const todayTasks = [
+  { id: 'task-1', title: '完成本周工作优先级整理', meta: '09:30 · 重点任务', done: true },
+  { id: 'task-2', title: '复习 Pure Mathematics 微积分', meta: '14:00 · 45 分钟' },
+  { id: 'task-3', title: '整理跨境电商新品素材', meta: '16:30 · 项目任务' },
+];
+
+const learningPaths = [
+  { title: 'A-Level 数学', code: 'MATH', progress: 62, current: 'Pure Mathematics · Integration', next: '完成 6 道积分练习题', color: '#5572e7' },
+  { title: 'AI Agent', code: 'AGENT', progress: 38, current: 'Tool Use · Function Calling', next: '搭建第一个工具调用 Demo', color: '#1c9b80' },
+];
+
+const projects = [
+  { title: '跨境电商', code: 'ECOMMERCE', status: '进行中', progress: 54, accent: '#d17b32', accentSoft: '#fff1e5', tasks: ['整理新品上架素材', '复盘广告数据', '检查核心商品库存'], resources: ['选品表', '素材库', '运营周报'] },
+  { title: '个人工作台开发', code: 'WORKSPACE', status: '设计阶段', progress: 72, accent: '#6674f6', accentSoft: '#eef0ff', tasks: ['确认首版信息架构', '完善移动端布局', '整理下一版功能清单'], resources: ['需求文档', '页面设计', '开发记录'] },
+];
+
 function BrandMark() {
+  return <div className="brand-mark" aria-hidden="true"><span /><span /><span /></div>;
+}
+
+function SectionHeading({ kicker, title, action }: { kicker: string; title: string; action?: string }) {
+  return <div className="card-heading module-heading"><div><span>{kicker}</span><h3>{title}</h3></div>{action && <button type="button">{action} <span>→</span></button>}</div>;
+}
+
+function TodayWorkspace() {
+  const [doneIds, setDoneIds] = useState(() => new Set(todayTasks.filter((task) => task.done).map((task) => task.id)));
+  const toggleTask = (taskId: string) => setDoneIds((current) => {
+    const next = new Set(current);
+    if (next.has(taskId)) next.delete(taskId); else next.add(taskId);
+    return next;
+  });
+
   return (
-    <div className="brand-mark" aria-hidden="true">
-      <span /><span /><span />
+    <div className="module-content module-content-today">
+      <article className="workspace-card task-module glass-panel">
+        <SectionHeading kicker="TODAY TASKS" title="今日任务" action="查看全部" />
+        <div className="task-list">
+          {todayTasks.map((task) => {
+            const checked = doneIds.has(task.id);
+            return <button className="task-row task-row-button" type="button" key={task.id} onClick={() => toggleTask(task.id)}><span className={`task-check ${checked ? 'checked' : ''}`}>{checked ? '✓' : ''}</span><span className="task-copy"><strong className={checked ? 'task-done' : ''}>{task.title}</strong><small>{task.meta}</small></span><span className="row-arrow">›</span></button>;
+          })}
+        </div>
+        <div className="task-progress"><span style={{ width: `${Math.round((doneIds.size / todayTasks.length) * 100)}%` }} /></div>
+        <small className="progress-caption">已完成 {doneIds.size}/{todayTasks.length}</small>
+      </article>
+
+      <article className="workspace-card quick-note glass-panel">
+        <SectionHeading kicker="QUICK CAPTURE" title="快速记录" />
+        <textarea aria-label="快速记录" placeholder="记下此刻的想法、待办或灵感…" rows={4} />
+        <div className="quick-note-footer"><span>⌘ + Enter 保存</span><button type="button" aria-label="保存记录">↑</button></div>
+      </article>
+
+      <article className="workspace-card recent-learning glass-panel">
+        <SectionHeading kicker="RECENT LEARNING" title="最近学习" action="进入学习中心" />
+        <div className="recent-list">
+          <div className="recent-row"><span className="recent-icon math">∫</span><div><strong>A-Level 数学</strong><small>Integration · 昨天学习 42 分钟</small></div><b>62%</b></div>
+          <div className="recent-row"><span className="recent-icon agent">✦</span><div><strong>AI Agent</strong><small>Function Calling · 3 天前更新</small></div><b>38%</b></div>
+        </div>
+      </article>
+
+      <article className="workspace-card project-shortcuts glass-panel">
+        <SectionHeading kicker="PROJECT SHORTCUTS" title="项目快捷入口" />
+        <div className="shortcut-list">
+          <button type="button"><span className="shortcut-icon commerce">◈</span><span><strong>跨境电商</strong><small>3 项待办</small></span><i>→</i></button>
+          <button type="button"><span className="shortcut-icon workspace">◇</span><span><strong>个人工作台开发</strong><small>本周推进中</small></span><i>→</i></button>
+        </div>
+      </article>
+    </div>
+  );
+}
+
+function LearningCenter() {
+  return (
+    <div className="module-content learning-layout">
+      <section className="learning-paths">
+        {learningPaths.map((path) => <article className="path-card glass-panel" key={path.title} style={{ '--path-accent': path.color } as React.CSSProperties}><div className="path-top"><span>{path.code}</span><b>{path.progress}%</b></div><h3>{path.title}</h3><p>{path.current}</p><div className="path-progress"><span style={{ width: `${path.progress}%` }} /></div><div className="path-next"><small>下一步</small><strong>{path.next}</strong></div><button type="button">继续学习 <span>→</span></button></article>)}
+      </section>
+
+      <article className="workspace-card resource-card glass-panel">
+        <SectionHeading kicker="RESOURCE LIBRARY" title="资料管理" action="全部资料" />
+        <div className="resource-stats"><div><strong>24</strong><span>课程资料</span></div><div><strong>18</strong><span>学习笔记</span></div><div><strong>07</strong><span>练习与项目</span></div></div>
+        <div className="resource-folders"><button type="button"><span className="folder-symbol">⌑</span><div><strong>A-Level Mathematics</strong><small>14 个文件 · 今天更新</small></div><i>›</i></button><button type="button"><span className="folder-symbol agent-folder">⌑</span><div><strong>AI Agent Lab</strong><small>11 个文件 · 昨天更新</small></div><i>›</i></button></div>
+      </article>
+
+      <article className="workspace-card study-progress glass-panel">
+        <SectionHeading kicker="WEEKLY PROGRESS" title="本周学习进度" />
+        <div className="weekly-hours"><strong>5.8</strong><span>小时<br />本周累计</span></div>
+        <div className="week-bars" aria-label="本周每日学习时长">{[32, 58, 44, 82, 64, 24, 12].map((height, index) => <div key={index}><span style={{ height: `${height}%` }} /><small>{'一二三四五六日'[index]}</small></div>)}</div>
+        <p>比上周多学习了 <strong>1.2 小时</strong>，保持现在的节奏。</p>
+      </article>
+    </div>
+  );
+}
+
+function ProjectCenter() {
+  return (
+    <div className="module-content project-layout">
+      <div className="project-summary-row"><div className="summary-chip glass-panel"><span>02</span><small>活跃项目</small></div><div className="summary-chip glass-panel"><span>06</span><small>本周待办</small></div><div className="summary-chip glass-panel"><span>04</span><small>最近资料</small></div></div>
+      <section className="project-card-list">
+        {projects.map((project) => <article className="project-card glass-panel" key={project.title} style={{ '--project-accent': project.accent, '--project-soft': project.accentSoft } as React.CSSProperties}><div className="project-card-head"><div><span>{project.code}</span><h3>{project.title}</h3></div><span className="project-status">{project.status}</span></div><div className="project-progress-row"><div><span style={{ width: `${project.progress}%` }} /></div><b>{project.progress}%</b></div><div className="project-columns"><div><small>近期任务</small>{project.tasks.map((task, index) => <p key={task}><i>{index + 1}</i>{task}</p>)}</div><div><small>项目资料</small><div className="resource-tags">{project.resources.map((resource) => <button type="button" key={resource}>⌑ {resource}</button>)}</div></div></div><button className="project-open" type="button">进入项目 <span>→</span></button></article>)}
+      </section>
     </div>
   );
 }
 
 export default function Home() {
-  const [activeId, setActiveId] = useState('home');
-  const active = useMemo(
-    () => sections.find((section) => section.id === activeId) ?? sections[0],
-    [activeId],
-  );
+  const [activeId, setActiveId] = useState<ModuleId>('today');
+  const active = useMemo(() => modules.find((item) => item.id === activeId) ?? modules[0], [activeId]);
 
   return (
     <main className="workspace-shell">
-      <div className="ambient ambient-one" />
-      <div className="ambient ambient-two" />
-
-      <div className="mobile-brand glass-panel">
-        <div className="brand-row">
-          <BrandMark />
-          <div><strong>LUCA</strong><span>个人工作台</span></div>
-        </div>
-        <span className="mobile-date">10月20日 · 周二</span>
-      </div>
-
+      <div className="ambient ambient-one" /><div className="ambient ambient-two" />
+      <div className="mobile-brand glass-panel"><div className="brand-row"><BrandMark /><div><strong>LUCA</strong><span>个人工作台</span></div></div><span className="mobile-date">10月20日 · 周二</span></div>
       <div className="workspace-grid">
         <aside className="sidebar glass-panel" aria-label="工作台导航">
-          <div className="brand-row desktop-brand">
-            <BrandMark />
-            <div><strong>LUCA</strong><span>个人工作台</span></div>
-          </div>
-
-          <div className="nav-caption">工作空间</div>
-          <nav className="workspace-nav">
-            {sections.map((section) => (
-              <button
-                key={section.id}
-                type="button"
-                className={`nav-item ${activeId === section.id ? 'active' : ''}`}
-                onClick={() => setActiveId(section.id)}
-                aria-current={activeId === section.id ? 'page' : undefined}
-                style={activeId === section.id ? ({
-                  '--active-color': section.accent,
-                  '--active-soft': section.accentSoft,
-                } as React.CSSProperties) : undefined}
-              >
-                <span className="nav-icon" aria-hidden="true">{section.icon}</span>
-                <span>{section.label}</span>
-                {activeId === section.id && <i className="nav-dot" aria-hidden="true" />}
-              </button>
-            ))}
-          </nav>
-
-          <div className="sidebar-footer">
-            <div className="avatar">L</div>
-            <div><strong>Lydia</strong><span>保持自己的节奏</span></div>
-            <button type="button" aria-label="更多选项">•••</button>
-          </div>
+          <div className="brand-row desktop-brand"><BrandMark /><div><strong>LUCA</strong><span>个人工作台</span></div></div>
+          <div className="nav-caption">核心空间</div>
+          <nav className="workspace-nav">{modules.map((item) => <button key={item.id} type="button" className={`nav-item ${activeId === item.id ? 'active' : ''}`} onClick={() => setActiveId(item.id)} aria-current={activeId === item.id ? 'page' : undefined} style={activeId === item.id ? ({ '--active-color': item.accent, '--active-soft': item.accentSoft } as React.CSSProperties) : undefined}><span className="nav-icon" aria-hidden="true">{item.icon}</span><span>{item.label}</span>{activeId === item.id && <i className="nav-dot" aria-hidden="true" />}</button>)}</nav>
+          <div className="sidebar-focus"><span>今日专注</span><strong>3h 20m</strong><div><i /></div><small>本周目标 12 小时</small></div>
+          <div className="sidebar-footer"><div className="avatar">L</div><div><strong>Lydia</strong><span>保持自己的节奏</span></div><button type="button" aria-label="更多选项">•••</button></div>
         </aside>
 
-        <section className="main-stage" style={{
-          '--section-accent': active.accent,
-          '--section-soft': active.accentSoft,
-        } as React.CSSProperties}>
-          <header className="stage-header">
-            <div>
-              <span className="date-line">2026年10月20日 · 星期二</span>
-              <h1>上午好，Lydia <span aria-hidden="true">☀</span></h1>
-            </div>
-            <div className="header-actions">
-              <button className="round-button" type="button" aria-label="搜索">⌕</button>
-              <button className="round-button notification" type="button" aria-label="通知">♢</button>
-            </div>
-          </header>
-
-          <div className="hero-card glass-panel" key={active.id}>
-            <div className="hero-copy">
-              <span className="eyebrow">{active.eyebrow}</span>
-              <h2>{active.title}</h2>
-              <p>{active.description}</p>
-              <button className="primary-action" type="button">
-                查看今日概览 <span aria-hidden="true">→</span>
-              </button>
-            </div>
-            <div className="hero-visual" aria-hidden="true">
-              <div className="orbit orbit-one" /><div className="orbit orbit-two" />
-              <div className="floating-card card-back"><span /><span /></div>
-              <div className="floating-card card-front">
-                <div className="floating-top"><i>{active.icon}</i><small>今日节奏</small></div>
-                <strong>清晰 · 专注</strong>
-                <div className="mini-progress"><span /></div>
-              </div>
-            </div>
-          </div>
-
-          <div className="metric-grid" aria-label={`${active.label}数据概览`}>
-            {active.metrics.map((metric, index) => (
-              <article className="metric-card glass-panel" key={metric.label}>
-                <div className={`metric-symbol symbol-${index + 1}`}>{index === 0 ? '↗' : index === 1 ? '≈' : '•'}</div>
-                <div><strong>{metric.value}</strong><span>{metric.label}</span></div>
-                <small>{metric.hint}</small>
-              </article>
-            ))}
-          </div>
-
-          <div className="detail-grid">
-            <article className="tasks-card glass-panel">
-              <div className="card-heading">
-                <div><span>今日安排</span><h3>接下来要做的事</h3></div>
-                <button type="button">全部 <span>→</span></button>
-              </div>
-              <div className="task-list">
-                {active.tasks.map((task) => (
-                  <div className="task-row" key={task.title}>
-                    <span className={`task-check ${task.done ? 'checked' : ''}`}>{task.done ? '✓' : ''}</span>
-                    <div><strong>{task.title}</strong><small>{task.meta}</small></div>
-                    <span className="row-arrow">›</span>
-                  </div>
-                ))}
-              </div>
-            </article>
-
-            <article className="rhythm-card glass-panel">
-              <div className="card-heading compact">
-                <div><span>本周状态</span><h3>节奏分布</h3></div>
-                <span className="status-pill">状态良好</span>
-              </div>
-              <div className="rhythm-chart">
-                {active.focus.map((item) => (
-                  <div className="bar-item" key={item.label}>
-                    <div className="bar-track"><span style={{ height: `${item.value}%` }} /></div>
-                    <small>{item.label}</small>
-                  </div>
-                ))}
-              </div>
-              <p className="daily-note">“{active.note}”</p>
-            </article>
-          </div>
+        <section className="main-stage" style={{ '--section-accent': active.accent, '--section-soft': active.accentSoft } as React.CSSProperties}>
+          <header className="stage-header"><div><span className="date-line">2026年10月20日 · 星期二</span><h1>{active.label}</h1></div><div className="header-actions"><button className="round-button" type="button" aria-label="搜索">⌕</button><button className="round-button notification" type="button" aria-label="通知">♢</button></div></header>
+          <div className="hero-card compact-hero glass-panel" key={active.id}><div className="hero-copy"><span className="eyebrow">{active.eyebrow}</span><h2>{active.title}</h2><p>{active.description}</p><button className="primary-action" type="button">{active.action} <span>→</span></button></div><div className="hero-visual module-visual" aria-hidden="true"><div className="orbit orbit-one" /><div className="orbit orbit-two" /><div className="module-glyph"><span>{active.icon}</span><small>{active.label}</small><div><i /><i /><i /></div></div></div></div>
+          {activeId === 'today' && <TodayWorkspace />}{activeId === 'learning' && <LearningCenter />}{activeId === 'projects' && <ProjectCenter />}
         </section>
 
         <aside className="ai-panel glass-panel" aria-label="AI 助力面板">
-          <div className="ai-header">
-            <div className="ai-title">
-              <span className="ai-orb">✦</span>
-              <div><strong>AI 助力</strong><span><i /> 随时待命</span></div>
-            </div>
-            <button type="button" aria-label="AI 面板选项">•••</button>
-          </div>
-
-          <div className="ai-conversation">
-            <div className="ai-welcome">
-              <span className="tiny-orb">✦</span>
-              <p>上午好，Lydia。今天想从哪里开始？我可以陪你一起梳理。</p>
-            </div>
-            <div className="suggestion-block">
-              <span>试着问我</span>
-              <button type="button"><i>↗</i> 帮我规划今天的优先级</button>
-              <button type="button"><i>✣</i> 总结本周工作进展</button>
-              <button type="button"><i>◷</i> 安排一段专注时间</button>
-            </div>
-            <div className="ai-insight">
-              <div className="insight-top"><span>今日小建议</span><i>NEW</i></div>
-              <p>先完成一件最重要的事，再处理零散任务，今天会更有掌控感。</p>
-            </div>
-          </div>
-
-          <div className="ai-composer">
-            <div className="composer-box">
-              <textarea rows={2} placeholder="告诉我你想做什么…" aria-label="向 AI 输入内容" />
-              <div className="composer-actions">
-                <div>
-                  <button type="button" aria-label="添加附件">＋</button>
-                  <button type="button" aria-label="语音输入">◉</button>
-                </div>
-                <button className="send-button" type="button" aria-label="发送">↑</button>
-              </div>
-            </div>
-            <small>AI 可能会出错，请核对重要信息</small>
-          </div>
+          <div className="ai-header"><div className="ai-title"><span className="ai-orb">✦</span><div><strong>AI 助力</strong><span><i /> 随时待命</span></div></div><button type="button" aria-label="AI 面板选项">•••</button></div>
+          <div className="ai-context"><span>当前模块</span><strong>{active.label}</strong><p>{active.description}</p></div>
+          <div className="ai-conversation"><div className="ai-welcome"><span className="tiny-orb">✦</span><p>你好，Lydia。关于{active.label}，我可以帮你梳理重点、拆解行动或整理资料。</p></div><div className="suggestion-block"><span>试着问我</span>{active.aiPrompts.map((prompt, index) => <button type="button" key={prompt}><i>{index === 0 ? '↗' : index === 1 ? '✣' : '◷'}</i>{prompt}</button>)}</div><div className="ai-insight"><div className="insight-top"><span>今日小建议</span><i>NEW</i></div><p>把下一步写得足够具体，开始行动会比等待完美状态更容易。</p></div></div>
+          <div className="ai-composer"><div className="composer-box"><textarea rows={2} placeholder="告诉我你想做什么…" aria-label="向 AI 输入内容" /><div className="composer-actions"><div><button type="button" aria-label="添加附件">＋</button><button type="button" aria-label="语音输入">◉</button></div><button className="send-button" type="button" aria-label="发送">↑</button></div></div><small>AI 可能会出错，请核对重要信息</small></div>
         </aside>
       </div>
     </main>
