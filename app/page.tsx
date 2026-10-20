@@ -1,8 +1,10 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import KnowledgeMap from '@/features/alevel/components/KnowledgeMap';
+import { syllabusStats } from '@/features/alevel/catalog';
 
-type ModuleId = 'today' | 'learning' | 'projects';
+type ModuleId = 'today' | 'learning' | 'alevel' | 'projects';
 
 type WorkspaceModule = {
   id: ModuleId;
@@ -31,6 +33,13 @@ const modules: WorkspaceModule[] = [
     description: '围绕 A-Level 数学与 AI Agent 两条主线，统一管理课程资料、阶段进度与下一步行动。',
     accent: '#168a78', accentSoft: '#e8f7f3', action: '继续上次学习',
     aiPrompts: ['解释一道 A-Level 数学题', '为我设计 AI Agent 学习计划', '整理今天的学习笔记'],
+  },
+  {
+    id: 'alevel', label: 'A-Level Mathematics', icon: 'Σ', eyebrow: 'SYLLABUS KNOWLEDGE HUB',
+    title: 'Build knowledge that is ready to teach.',
+    description: 'Explore the complete CAIE 9709 syllabus, trace every official learning outcome and build a connected teaching knowledge base.',
+    accent: '#5572e7', accentSoft: '#eef1ff', action: 'Open knowledge map',
+    aiPrompts: ['Explain this learning outcome', 'Show prerequisite knowledge', 'Draft a teaching objective'],
   },
   {
     id: 'projects', label: '项目中心', icon: '◇', eyebrow: 'PROJECT CENTER',
@@ -405,26 +414,26 @@ function AlevelHomePage() {
   return (
     <div className="alevel-dashboard">
       <section className="alevel-stat-grid">
-        <div><span>本周学习</span><strong>4.6h</strong><small>目标 6 小时</small></div>
-        <div><span>课程进度</span><strong>62%</strong><small>Pure 3 进行中</small></div>
-        <div><span>待复习</span><strong>08</strong><small>2 个高频错题</small></div>
+        <div><span>Official topics</span><strong>{syllabusStats.topics}</strong><small>Across 6 components</small></div>
+        <div><span>Learning outcomes</span><strong>{syllabusStats.learningOutcomes}</strong><small>Verified against the syllabus</small></div>
+        <div><span>Knowledge points</span><strong>{syllabusStats.knowledgePoints}</strong><small>Derived teaching layer</small></div>
       </section>
       <section className="alevel-home-grid">
         <article className="alevel-panel">
-          <SectionHeading kicker="TODAY" title="今日任务" action="全部任务" />
+          <SectionHeading kicker="PHASE 1 FOUNDATION" title="Syllabus knowledge foundation" action="View map" />
           <div className="math-task-list">
-            <button type="button"><i>1</i><span><strong>Integration by substitution</strong><small>练习 6 题 · 预计 35 分钟</small></span><b>开始</b></button>
-            <button type="button"><i>2</i><span><strong>复盘昨日错题</strong><small>Pure Mathematics · Chapter 7</small></span><b>查看</b></button>
-            <button type="button"><i>3</i><span><strong>整理公式卡片</strong><small>Statistics · Probability</small></span><b>继续</b></button>
+            <button type="button"><i>1</i><span><strong>Browse all official components</strong><small>P1–P6 · 38 official topics</small></span><b>Open</b></button>
+            <button type="button"><i>2</i><span><strong>Review official learning outcomes</strong><small>153 traceable syllabus statements</small></span><b>Review</b></button>
+            <button type="button"><i>3</i><span><strong>Validate prerequisite links</strong><small>Cross-topic teaching dependencies</small></span><b>Check</b></button>
           </div>
         </article>
         <article className="alevel-panel continue-card">
-          <span className="continue-kicker">CONTINUE LEARNING</span>
-          <span className="continue-symbol">∫</span>
-          <h3>Integration</h3>
-          <p>Pure Mathematics 3 · 章节 7.2</p>
-          <div><span style={{ width: '68%' }} /></div>
-          <button type="button">继续学习 <span>→</span></button>
+          <span className="continue-kicker">OFFICIAL SOURCE</span>
+          <span className="continue-symbol">Σ</span>
+          <h3>2026–2027</h3>
+          <p>Cambridge International · Version 4</p>
+          <div><span style={{ width: '100%' }} /></div>
+          <button type="button">Source verified <span>✓</span></button>
         </article>
       </section>
     </div>
@@ -432,12 +441,7 @@ function AlevelHomePage() {
 }
 
 function AlevelKnowledgeMap() {
-  const tracks = [
-    { name: 'Pure Mathematics', detail: 'Algebra · Calculus · Trigonometry', progress: 66, color: '#5572e7' },
-    { name: 'Statistics', detail: 'Probability · Distribution · Hypothesis', progress: 42, color: '#9b6bdb' },
-    { name: 'Mechanics', detail: 'Forces · Motion · Momentum', progress: 28, color: '#d17b32' },
-  ];
-  return <div className="alevel-subpage"><div className="subpage-heading"><span>KNOWLEDGE MAP</span><h3>知识地图</h3><p>按考试体系组织章节，清楚看到已掌握、学习中和待开始的知识点。</p></div><div className="knowledge-tracks">{tracks.map((track) => <article key={track.name} style={{ '--track-color': track.color } as React.CSSProperties}><div><span>◉</span><b>{track.progress}%</b></div><h4>{track.name}</h4><p>{track.detail}</p><div className="track-progress"><span style={{ width: `${track.progress}%` }} /></div><button type="button">展开章节 <span>→</span></button></article>)}</div></div>;
+  return <KnowledgeMap />;
 }
 
 function AlevelPlanPage() {
@@ -454,7 +458,7 @@ function AlevelWorkspace({ activePage, onSelect, onBack }: { activePage: AlevelP
     <div className="module-content alevel-workspace">
       <div className="alevel-breadcrumb"><button type="button" onClick={onBack} aria-label="返回学习中心">←</button><span>学习中心</span><i>›</i><strong>A-Level 数学</strong></div>
       <header className="alevel-header"><div className="alevel-title-icon">Σ</div><div><span>A-LEVEL MATHEMATICS</span><h2>A-Level 数学</h2><p>专注学习、资料管理与教学准备的统一空间。</p></div><div className="alevel-overall"><span>总体进度</span><strong>62%</strong></div></header>
-      <div className="alevel-shell">
+      <div className={`alevel-shell ${activePage === 'map' ? 'map-active' : ''}`}>
         <nav className="alevel-subnav glass-panel" aria-label="A-Level 数学二级导航">
           {alevelPages.map((page) => <button type="button" key={page.id} className={page.id === activePage ? 'active' : ''} onClick={() => onSelect(page.id)} aria-current={page.id === activePage ? 'page' : undefined}><span className="alevel-nav-icon">{page.icon}</span><span><strong>{page.name}</strong><small>{page.desc}</small></span><i>›</i></button>)}
         </nav>
@@ -512,6 +516,7 @@ function ProjectCenter() {
 
 export default function Home() {
   const [activeId, setActiveId] = useState<ModuleId>('today');
+  const [directMathPage, setDirectMathPage] = useState<AlevelPageId>('map');
   const active = useMemo(() => modules.find((item) => item.id === activeId) ?? modules[0], [activeId]);
 
   return (
@@ -530,7 +535,10 @@ export default function Home() {
         <section className="main-stage" style={{ '--section-accent': active.accent, '--section-soft': active.accentSoft } as React.CSSProperties}>
           <header className="stage-header"><div><span className="date-line">2026年10月20日 · 星期二</span><h1>{active.label}</h1></div><div className="header-actions"><button className="round-button" type="button" aria-label="搜索">⌕</button><button className="round-button notification" type="button" aria-label="通知">♢</button></div></header>
           <div className="hero-card compact-hero glass-panel" key={active.id}><div className="hero-copy"><span className="eyebrow">{active.eyebrow}</span><h2>{active.title}</h2><p>{active.description}</p><button className="primary-action" type="button">{active.action} <span>→</span></button></div><div className="hero-visual module-visual" aria-hidden="true"><div className="orbit orbit-one" /><div className="orbit orbit-two" /><div className="module-glyph"><span>{active.icon}</span><small>{active.label}</small><div><i /><i /><i /></div></div></div></div>
-          {activeId === 'today' && <TodayWorkspace />}{activeId === 'learning' && <LearningCenter />}{activeId === 'projects' && <ProjectCenter />}
+          {activeId === 'today' && <TodayWorkspace />}
+          {activeId === 'learning' && <LearningCenter />}
+          {activeId === 'alevel' && <AlevelWorkspace activePage={directMathPage} onSelect={setDirectMathPage} onBack={() => setActiveId('learning')} />}
+          {activeId === 'projects' && <ProjectCenter />}
         </section>
 
         <aside className="ai-panel glass-panel" aria-label="AI 助力面板">
