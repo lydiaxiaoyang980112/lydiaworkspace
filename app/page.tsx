@@ -1,8 +1,13 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import LearningAnalytics from '@/features/alevel/components/LearningAnalytics';
 import KnowledgeMap from '@/features/alevel/components/KnowledgeMap';
-import { syllabusStats } from '@/features/alevel/catalog';
+import { caie9709Catalog, knowledgePoints } from '@/features/alevel/catalog';
+import { getOverallProgress } from '@/features/alevel/analytics/service';
+import { readAlevelLocation, writeAlevelLocation } from '@/features/alevel/navigation';
+import type { AlevelPage } from '@/features/alevel/navigation';
+import { LearningProgressProvider, useLearningProgress } from '@/features/alevel/progress/ProgressProvider';
 
 type ModuleId = 'today' | 'learning' | 'alevel' | 'projects';
 
@@ -61,10 +66,10 @@ const learningPaths = [
   { title: 'AI Agent', code: 'AGENT', progress: 38, current: 'Tool Use · Function Calling', next: '搭建第一个工具调用 Demo', color: '#1c9b80' },
 ];
 
-type AlevelPageId = 'home' | 'resources' | 'map' | 'plan' | 'teaching';
+type AlevelPageId = AlevelPage;
 
 const alevelPages: Array<{ id: AlevelPageId; icon: string; name: string; desc: string }> = [
-  { id: 'home', icon: 'Σ', name: '学习主页', desc: '今日任务、学习进度、继续学习' },
+  { id: 'home', icon: '◫', name: '学习分析', desc: 'KPI、总体进度、组件对比' },
   { id: 'resources', icon: '⌑', name: '资料中心', desc: '在线文档链接、搜索、编辑与分类' },
   { id: 'map', icon: '⌘', name: '知识地图', desc: 'Pure、Statistics、Mechanics 章节体系' },
   { id: 'plan', icon: '◷', name: '学习计划', desc: '周计划、每日任务、复习安排' },
@@ -410,34 +415,8 @@ function AlevelResourcePage() {
   );
 }
 
-function AlevelHomePage() {
-  return (
-    <div className="alevel-dashboard">
-      <section className="alevel-stat-grid">
-        <div><span>Official topics</span><strong>{syllabusStats.topics}</strong><small>Across 6 components</small></div>
-        <div><span>Learning outcomes</span><strong>{syllabusStats.learningOutcomes}</strong><small>Verified against the syllabus</small></div>
-        <div><span>Knowledge points</span><strong>{syllabusStats.knowledgePoints}</strong><small>Derived teaching layer</small></div>
-      </section>
-      <section className="alevel-home-grid">
-        <article className="alevel-panel">
-          <SectionHeading kicker="PHASE 1 FOUNDATION" title="Syllabus knowledge foundation" action="View map" />
-          <div className="math-task-list">
-            <button type="button"><i>1</i><span><strong>Browse all official components</strong><small>P1–P6 · 38 official topics</small></span><b>Open</b></button>
-            <button type="button"><i>2</i><span><strong>Review official learning outcomes</strong><small>153 traceable syllabus statements</small></span><b>Review</b></button>
-            <button type="button"><i>3</i><span><strong>Validate prerequisite links</strong><small>Cross-topic teaching dependencies</small></span><b>Check</b></button>
-          </div>
-        </article>
-        <article className="alevel-panel continue-card">
-          <span className="continue-kicker">OFFICIAL SOURCE</span>
-          <span className="continue-symbol">Σ</span>
-          <h3>2026–2027</h3>
-          <p>Cambridge International · Version 4</p>
-          <div><span style={{ width: '100%' }} /></div>
-          <button type="button">Source verified <span>✓</span></button>
-        </article>
-      </section>
-    </div>
-  );
+function AlevelHomePage({ onOpenMap }: { onOpenMap: () => void }) {
+  return <LearningAnalytics onOpenMap={onOpenMap} />;
 }
 
 function AlevelKnowledgeMap() {
@@ -454,16 +433,22 @@ function AlevelTeachingPage() {
 
 function AlevelWorkspace({ activePage, onSelect, onBack }: { activePage: AlevelPageId; onSelect: (page: AlevelPageId) => void; onBack: () => void }) {
   const current = alevelPages.find((page) => page.id === activePage) ?? alevelPages[0];
+  const { points: progress } = useLearningProgress();
+  const overall = getOverallProgress(knowledgePoints, progress, caie9709Catalog);
+  const selectPage = (page: AlevelPageId) => {
+    writeAlevelLocation({ ...readAlevelLocation(), page });
+    onSelect(page);
+  };
   return (
     <div className="module-content alevel-workspace">
       <div className="alevel-breadcrumb"><button type="button" onClick={onBack} aria-label="返回学习中心">←</button><span>学习中心</span><i>›</i><strong>A-Level 数学</strong></div>
-      <header className="alevel-header"><div className="alevel-title-icon">Σ</div><div><span>A-LEVEL MATHEMATICS</span><h2>A-Level 数学</h2><p>专注学习、资料管理与教学准备的统一空间。</p></div><div className="alevel-overall"><span>总体进度</span><strong>62%</strong></div></header>
+      <header className="alevel-header"><div className="alevel-title-icon">Σ</div><div><span>A-LEVEL MATHEMATICS</span><h2>A-Level 数学</h2><p>专注学习、资料管理与教学准备的统一空间。</p></div><div className="alevel-overall"><span>MASTERY RATE</span><strong>{overall.masteryRate === null ? 'N/A' : `${Math.round(overall.masteryRate)}%`}</strong></div></header>
       <div className={`alevel-shell ${activePage === 'map' ? 'map-active' : ''}`}>
         <nav className="alevel-subnav glass-panel" aria-label="A-Level 数学二级导航">
-          {alevelPages.map((page) => <button type="button" key={page.id} className={page.id === activePage ? 'active' : ''} onClick={() => onSelect(page.id)} aria-current={page.id === activePage ? 'page' : undefined}><span className="alevel-nav-icon">{page.icon}</span><span><strong>{page.name}</strong><small>{page.desc}</small></span><i>›</i></button>)}
+          {alevelPages.map((page) => <button type="button" key={page.id} className={page.id === activePage ? 'active' : ''} onClick={() => selectPage(page.id)} aria-current={page.id === activePage ? 'page' : undefined}><span className="alevel-nav-icon">{page.icon}</span><span><strong>{page.name}</strong><small>{page.desc}</small></span><i>›</i></button>)}
         </nav>
         <section className="alevel-page glass-panel" aria-label={current.name}>
-          {activePage === 'home' && <AlevelHomePage />}
+          {activePage === 'home' && <AlevelHomePage onOpenMap={() => onSelect('map')} />}
           {activePage === 'resources' && <AlevelResourcePage />}
           {activePage === 'map' && <AlevelKnowledgeMap />}
           {activePage === 'plan' && <AlevelPlanPage />}
@@ -478,13 +463,15 @@ function LearningCenter() {
   const [view, setView] = useState<'overview' | 'alevel'>('overview');
   const [mathPage, setMathPage] = useState<AlevelPageId>('home');
   const openMath = (page: AlevelPageId) => { setMathPage(page); setView('alevel'); };
+  const { points: progress } = useLearningProgress();
+  const mathProgress = getOverallProgress(knowledgePoints, progress, caie9709Catalog);
 
   if (view === 'alevel') return <AlevelWorkspace activePage={mathPage} onSelect={setMathPage} onBack={() => setView('overview')} />;
 
   return (
     <div className="module-content learning-layout">
       <section className="learning-paths">
-        {learningPaths.map((path) => <article className="path-card glass-panel" key={path.title} style={{ '--path-accent': path.color } as React.CSSProperties}><div className="path-top"><span>{path.code}</span><b>{path.progress}%</b></div><h3>{path.title}</h3><p>{path.current}</p><div className="path-progress"><span style={{ width: `${path.progress}%` }} /></div><div className="path-next"><small>下一步</small><strong>{path.next}</strong></div><button type="button" onClick={path.code === 'MATH' ? () => openMath('home') : undefined}>{path.code === 'MATH' ? '进入数学空间' : '继续学习'} <span>→</span></button></article>)}
+        {learningPaths.map((path) => { const displayedProgress = path.code === 'MATH' ? Math.round(mathProgress.masteryRate ?? 0) : path.progress; return <article className="path-card glass-panel" key={path.title} style={{ '--path-accent': path.color } as React.CSSProperties}><div className="path-top"><span>{path.code}</span><b>{displayedProgress}%</b></div><h3>{path.title}</h3><p>{path.current}</p><div className="path-progress"><span style={{ width: `${displayedProgress}%` }} /></div><div className="path-next"><small>下一步</small><strong>{path.next}</strong></div><button type="button" onClick={path.code === 'MATH' ? () => openMath('home') : undefined}>{path.code === 'MATH' ? '进入数学空间' : '继续学习'} <span>→</span></button></article>; })}
       </section>
 
       <article className="workspace-card resource-card glass-panel">
@@ -514,10 +501,23 @@ function ProjectCenter() {
   );
 }
 
-export default function Home() {
+function WorkspaceApp() {
   const [activeId, setActiveId] = useState<ModuleId>('today');
-  const [directMathPage, setDirectMathPage] = useState<AlevelPageId>('map');
+  const [directMathPage, setDirectMathPage] = useState<AlevelPageId>('home');
   const active = useMemo(() => modules.find((item) => item.id === activeId) ?? modules[0], [activeId]);
+
+  useEffect(() => {
+    const restoreLocation = () => {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get('module') === 'alevel') {
+        setActiveId('alevel');
+        setDirectMathPage(readAlevelLocation().page ?? 'home');
+      }
+    };
+    restoreLocation();
+    window.addEventListener('popstate', restoreLocation);
+    return () => window.removeEventListener('popstate', restoreLocation);
+  }, []);
 
   return (
     <main className="workspace-shell">
@@ -550,4 +550,8 @@ export default function Home() {
       </div>
     </main>
   );
+}
+
+export default function Home() {
+  return <LearningProgressProvider><WorkspaceApp /></LearningProgressProvider>;
 }

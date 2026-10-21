@@ -1,6 +1,50 @@
 export type LearningStatus = 'not_started' | 'learning' | 'practising' | 'mastered';
 export type TeachingStatus = 'not_started' | 'preparing' | 'ready' | 'taught';
 
+export type PointProgress = {
+  learningStatus: LearningStatus;
+  teachingStatus: TeachingStatus;
+  updatedAt: string | null;
+  syllabusVersionId: string;
+};
+
+export type ProgressStore = Record<string, PointProgress>;
+
+export type ProgressEvent = {
+  id: string;
+  knowledgePointId: string;
+  syllabusVersionId: string;
+  previousStatus: LearningStatus;
+  nextStatus: LearningStatus;
+  occurredAt: string;
+};
+
+export type ProgressSnapshot = {
+  version: 2;
+  syllabusVersionId: string;
+  points: ProgressStore;
+  events: ProgressEvent[];
+};
+
+export type AnalyticsFilters = {
+  examBoardId?: string;
+  syllabusVersionId?: string;
+  routeId?: string;
+  componentId?: string;
+  topicId?: string;
+};
+
+export type ProgressSummary = {
+  total: number;
+  mastered: number;
+  practising: number;
+  learning: number;
+  notStarted: number;
+  inProgress: number;
+  masteryRate: number | null;
+  startedRate: number | null;
+};
+
 export type ExamBoard = {
   id: string;
   name: string;

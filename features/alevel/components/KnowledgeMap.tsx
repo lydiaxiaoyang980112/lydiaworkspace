@@ -3,19 +3,16 @@
 import { useState } from 'react';
 import type { CSSProperties } from 'react';
 import { caie9709Catalog, knowledgePoints } from '../catalog';
-import type { LearningStatus, TeachingStatus } from '../types';
-
-type PointProgress = {
-  learningStatus: LearningStatus;
-  teachingStatus: TeachingStatus;
-};
-
-type ProgressStore = Record<string, PointProgress>;
+import { readAlevelLocation, writeAlevelLocation } from '../navigation';
+import { useLearningProgress } from '../progress/ProgressProvider';
+import type { LearningStatus, PointProgress, TeachingStatus } from '../types';
 type DetailTab = 'overview' | 'official' | 'prerequisites' | 'teaching';
 
 const defaultProgress: PointProgress = {
   learningStatus: 'not_started',
   teachingStatus: 'not_started',
+  updatedAt: null,
+  syllabusVersionId: caie9709Catalog.syllabusVersion.id,
 };
 
 const learningLabels: Record<LearningStatus, string> = {
@@ -32,24 +29,28 @@ const teachingLabels: Record<TeachingStatus, string> = {
   taught: 'Taught',
 };
 
-function readProgress(): ProgressStore {
-  if (typeof window === 'undefined') return {};
-  try {
-    return JSON.parse(window.localStorage.getItem('luca-alevel-kp-progress-v1') ?? '{}') as ProgressStore;
-  } catch {
-    return {};
-  }
-}
-
 export default function KnowledgeMap() {
-  const [routeId, setRouteId] = useState('all');
-  const [componentId, setComponentId] = useState('p1');
-  const [topicId, setTopicId] = useState(caie9709Catalog.topics[0].id);
-  const [outcomeId, setOutcomeId] = useState(caie9709Catalog.learningOutcomes[0].id);
+  const initialLocation = readAlevelLocation();
+  const initialRoute = caie9709Catalog.qualificationRoutes.some((route) => route.id === initialLocation.routeId) ? initialLocation.routeId! : 'all';
+  const initialRouteComponents = caie9709Catalog.qualificationRoutes.find((route) => route.id === initialRoute)?.componentIds ?? caie9709Catalog.components.map((component) => component.id);
+  const requestedComponent = initialLocation.componentId && initialLocation.componentId !== 'all' ? initialLocation.componentId : initialRouteComponents[0];
+  const initialComponent = initialRouteComponents.includes(requestedComponent) ? requestedComponent : initialRouteComponents[0];
+  const requestedTopic = caie9709Catalog.topics.find((topic) => topic.id === initialLocation.topicId && topic.componentId === initialComponent);
+  const initialTopic = requestedTopic ?? caie9709Catalog.topics.find((topic) => topic.componentId === initialComponent)!;
+  const { points: progress, updatePointProgress } = useLearningProgress();
+  const [routeId, setRouteId] = useState(initialRoute);
+  const [componentId, setComponentId] = useState(initialComponent);
+  const [topicId, setTopicId] = useState(initialTopic.id);
+  const [outcomeId, setOutcomeId] = useState(caie9709Catalog.learningOutcomes.find((outcome) => outcome.topicId === initialTopic.id)!.id);
   const [query, setQuery] = useState('');
   const [view, setView] = useState<'outline' | 'dependency'>('outline');
   const [detailTab, setDetailTab] = useState<DetailTab>('overview');
-  const [progress, setProgress] = useState<ProgressStore>(readProgress);
+  const [statusFilter, setStatusFilter] = useState<LearningStatus | 'all'>(initialLocation.status ?? 'all');
+  const [statusScope, setStatusScope] = useState(
+    initialLocation.componentId === 'all' || (!initialLocation.componentId && initialLocation.status && initialLocation.status !== 'all')
+      ? 'all'
+      : initialComponent,
+  );
 
   const activeRoute = caie9709Catalog.qualificationRoutes.find((route) => route.id === routeId);
   const visibleComponentIds = activeRoute?.componentIds ?? caie9709Catalog.components.map((component) => component.id);
@@ -61,12 +62,16 @@ export default function KnowledgeMap() {
   const matchingOutcomes = (() => {
     const term = query.trim().toLowerCase();
     const allowedTopicIds = new Set(caie9709Catalog.topics.filter((topic) => visibleComponentIds.includes(topic.componentId)).map((topic) => topic.id));
-    if (term) {
+    if (term || statusFilter !== 'all') {
       return caie9709Catalog.learningOutcomes.filter((outcome) => {
         const topic = caie9709Catalog.topics.find((item) => item.id === outcome.topicId);
         if (!topic) return false;
-        return allowedTopicIds.has(outcome.topicId)
-          && (`${topic.reference} ${topic.title} ${outcome.officialText}`).toLowerCase().includes(term);
+        const pointId = `${outcome.id}-kp-01`;
+        const status = progress[pointId]?.learningStatus ?? 'not_started';
+        const matchesText = !term || (`${topic.reference} ${topic.title} ${outcome.officialText}`).toLowerCase().includes(term);
+        const matchesStatus = statusFilter === 'all' || status === statusFilter;
+        const matchesComponent = statusScope === 'all' || topic.componentId === statusScope;
+        return allowedTopicIds.has(outcome.topicId) && matchesText && matchesStatus && matchesComponent;
       });
     }
     return caie9709Catalog.learningOutcomes.filter((outcome) => outcome.topicId === selectedTopic?.id);
@@ -87,6 +92,8 @@ export default function KnowledgeMap() {
     setOutcomeId(nextOutcome.id);
     setQuery('');
     setDetailTab('overview');
+    setStatusScope(nextComponentId);
+    writeAlevelLocation({ page: 'map', routeId, componentId: nextComponentId, topicId: nextTopic.id, status: statusFilter }, 'replace');
   };
 
   const selectTopic = (nextTopicId: string) => {
@@ -97,6 +104,8 @@ export default function KnowledgeMap() {
     setOutcomeId(nextOutcome.id);
     setQuery('');
     setDetailTab('overview');
+    setStatusScope(nextTopic.componentId);
+    writeAlevelLocation({ page: 'map', routeId, componentId: nextTopic.componentId, topicId: nextTopicId, status: statusFilter }, 'replace');
   };
 
   const selectOutcome = (nextOutcomeId: string) => {
@@ -106,24 +115,32 @@ export default function KnowledgeMap() {
     setTopicId(nextTopic.id);
     setOutcomeId(nextOutcomeId);
     setDetailTab('overview');
+    writeAlevelLocation({ page: 'map', routeId, componentId: statusScope, topicId: nextTopic.id, status: statusFilter }, 'replace');
   };
 
   const selectRoute = (nextRouteId: string) => {
     setRouteId(nextRouteId);
-    if (nextRouteId === 'all') return;
+    if (nextRouteId === 'all') {
+      writeAlevelLocation({ page: 'map', routeId: nextRouteId, componentId: statusScope, topicId, status: statusFilter }, 'replace');
+      return;
+    }
     const route = caie9709Catalog.qualificationRoutes.find((item) => item.id === nextRouteId)!;
-    if (!route.componentIds.includes(componentId)) selectComponent(route.componentIds[0]);
+    if (!route.componentIds.includes(componentId)) {
+      const nextComponentId = route.componentIds[0];
+      const nextTopic = caie9709Catalog.topics.find((topic) => topic.componentId === nextComponentId)!;
+      const nextOutcome = caie9709Catalog.learningOutcomes.find((outcome) => outcome.topicId === nextTopic.id)!;
+      setComponentId(nextComponentId);
+      setTopicId(nextTopic.id);
+      setOutcomeId(nextOutcome.id);
+      setStatusScope(statusScope === 'all' ? 'all' : nextComponentId);
+      writeAlevelLocation({ page: 'map', routeId: nextRouteId, componentId: statusScope === 'all' ? 'all' : nextComponentId, topicId: nextTopic.id, status: statusFilter }, 'replace');
+      return;
+    }
+    writeAlevelLocation({ page: 'map', routeId: nextRouteId, componentId: statusScope, topicId, status: statusFilter }, 'replace');
   };
 
   const updateProgress = (patch: Partial<PointProgress>) => {
-    setProgress((current) => {
-      const next = {
-        ...current,
-        [selectedPoint.id]: { ...(current[selectedPoint.id] ?? defaultProgress), ...patch },
-      };
-      window.localStorage.setItem('luca-alevel-kp-progress-v1', JSON.stringify(next));
-      return next;
-    });
+    updatePointProgress(selectedPoint.id, patch);
   };
 
   const prerequisitePoints = selectedPoint.prerequisiteIds
@@ -151,6 +168,14 @@ export default function KnowledgeMap() {
           <option value="all">All official components</option>
           {caie9709Catalog.qualificationRoutes.map((route) => <option key={route.id} value={route.id}>{route.name}</option>)}
         </select>
+        <select className="km-status-filter" value={statusFilter} onChange={(event) => {
+          const nextStatus = event.target.value as LearningStatus | 'all';
+          setStatusFilter(nextStatus);
+          writeAlevelLocation({ page: 'map', routeId, componentId: statusScope, topicId, status: nextStatus }, 'replace');
+        }} aria-label="Learning status">
+          <option value="all">All learning statuses</option>
+          {Object.entries(learningLabels).map(([value, label]) => <option value={value} key={value}>{label}</option>)}
+        </select>
         <div className="km-view-toggle" aria-label="Knowledge map view">
           <button type="button" className={view === 'outline' ? 'active' : ''} onClick={() => setView('outline')}>Outline</button>
           <button type="button" className={view === 'dependency' ? 'active' : ''} onClick={() => setView('dependency')}>Dependencies</button>
@@ -176,7 +201,7 @@ export default function KnowledgeMap() {
 
         <section className="km-canvas">
           <div className="km-canvas-heading">
-            <div><span>{query ? 'SEARCH RESULTS' : selectedComponent?.paper}</span><h4>{query ? `${matchingOutcomes.length} matching outcomes` : `${selectedTopic?.reference} ${selectedTopic?.title}`}</h4></div>
+            <div><span>{query || statusFilter !== 'all' ? 'FILTERED RESULTS' : selectedComponent?.paper}</span><h4>{query || statusFilter !== 'all' ? `${matchingOutcomes.length} matching outcomes` : `${selectedTopic?.reference} ${selectedTopic?.title}`}</h4></div>
             <span className="km-verified">✓ Official source verified</span>
           </div>
 
